@@ -527,4 +527,757 @@ class WidgetManager {
         `;
     }
 
-    // Continue with remaining methods...
+/**
+     * Set up widget interactions (drag, resize, controls)
+     */
+    setupWidgetInteractions(element, widget) {
+        const header = element.querySelector('.widget-header');
+        const resizeHandle = element.querySelector('.widget-resize-handle');
+        const controls = element.querySelectorAll('.widget-control-btn');
+        
+        // Dragging
+        header.addEventListener('mousedown', this.handleWidgetDragStart.bind(this, widget.id));
+        
+        // Resizing
+        resizeHandle.addEventListener('mousedown', this.handleWidgetResizeStart.bind(this, widget.id));
+        
+        // Control buttons
+        controls.forEach(btn => {
+            btn.addEventListener('click', this.handleWidgetControl.bind(this, widget.id));
+        });
+        
+        // Widget selection
+        element.addEventListener('click', this.handleWidgetClick.bind(this, widget.id));
+        element.addEventListener('keydown', this.handleWidgetKeyDown.bind(this, widget.id));
+        
+        // Agent chip interactions for chat widgets
+        if (widget.type === 'multi-agent-chat') {
+            this.setupChatWidgetInteractions(element, widget);
+        }
+    }
+
+    /**
+     * Set up chat widget specific interactions
+     */
+    setupChatWidgetInteractions(element, widget) {
+        const agentChips = element.querySelectorAll('.agent-chip');
+        const chatForm = element.querySelector('.chat-input-form');
+        const chatInput = element.querySelector('.chat-input');
+        
+        // Agent selection
+        agentChips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                chip.classList.toggle('active');
+                this.updateWidgetConfig(widget.id, {
+                    enabledAgents: Array.from(element.querySelectorAll('.agent-chip.active'))
+                        .map(c => c.dataset.agent)
+                });
+            });
+        });
+        
+        // Chat submission
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleChatSubmission(widget.id, chatInput.value.trim());
+        });
+        
+        // Auto-resize textarea
+        chatInput.addEventListener('input', () => {
+            chatInput.style.height = 'auto';
+            chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+        });
+    }
+
+    /**
+     * Handle chat message submission
+     */
+    async handleChatSubmission(widgetId, message) {
+        if (!message) return;
+        
+        const widget = this.widgets.get(widgetId);
+        const element = document.getElementById(widgetId);
+        const messagesContainer = element.querySelector('.chat-messages');
+        const chatInput = element.querySelector('.chat-input');
+        
+        // Clear input
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+        
+        // Add user message
+        this.addChatMessage(messagesContainer, {
+            type: 'user',
+            content: message,
+            timestamp: new Date()
+        });
+        
+        // Get enabled agents
+        const enabledAgents = Array.from(element.querySelectorAll('.agent-chip.active'))
+            .map(chip => chip.dataset.agent);
+        
+        if (enabledAgents.length === 0) {
+            this.addChatMessage(messagesContainer, {
+                type: 'system',
+                content: 'Please select at least one agent to process your query.',
+                timestamp: new Date()
+            });
+            return;
+        }
+        
+        // Show typing indicator
+        const typingIndicator = this.addTypingIndicator(messagesContainer);
+        
+        try {
+            // Process query through agent orchestrator
+            const response = await AgentOrchestrator.processQuery({
+                message,
+                agents: enabledAgents,
+                widgetId,
+                context: widget.config.context || {}
+            });
+            
+            // Remove typing indicator
+            typingIndicator.remove();
+            
+            // Add response
+            this.addChatMessage(messagesContainer, {
+                type: 'assistant',
+                content: response.content,
+                sources: response.sources,
+                agents: response.agents,
+                timestamp: new Date()
+            });
+            
+        } catch (error) {
+            console.error('Chat submission error:', error);
+            
+            // Remove typing indicator
+            typingIndicator.remove();
+            
+            // Add error message
+            this.addChatMessage(messagesContainer, {
+                type: 'error',
+                content: 'Sorry, I encountered an error processing your request. Please try again.',
+                timestamp: new Date()
+            });
+        }
+    }
+
+    /**
+     * Add a chat message to the conversation
+     */
+    addChatMessage(container, message) {
+        const messageEl = document.createElement('div');
+        messageEl.className = `chat-message ${message.type}`;
+        messageEl.setAttribute('role', 'log');
+        
+        const timeString = message.timestamp.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        let sourcesHtml = '';
+        if (message.sources && message.sources.length > 0) {
+            sourcesHtml = message.sources.map(source => 
+                `<span class="source-citation" title="${this.escapeHtml(source.description)}">
+                    ${this.escapeHtml(source.name)}
+                </span>`
+            ).join('');
+        }
+        
+        let agentsHtml = '';
+        if (message.agents && message.agents.length > 0) {
+            agentsHtml = `<div class="responding-agents">
+                ${message.agents.map(agent => 
+                    `<span class="agent-badge">${this.escapeHtml(agent)}</span>`
+                ).join('')}
+            </div>`;
+        }
+        
+        messageEl.innerHTML = `
+            <div class="message-header">
+                <span class="message-sender">${this.getMessageSender(message.type, message.agents)}</span>
+                <span class="message-time">${timeString}</span>
+            </div>
+            <div class="message-content">
+                ${this.escapeHtml(message.content)}
+                ${sourcesHtml}
+            </div>
+            ${agentsHtml}
+        `;
+        
+        container.appendChild(messageEl);
+        container.scrollTop = container.scrollHeight;
+        
+        // Announce to screen reader
+        AICanvas.announceToScreenReader(`New message from ${this.getMessageSender(message.type, message.agents)}`);
+    }
+
+    /**
+     * Add typing indicator
+     */
+    addTypingIndicator(container) {
+        const indicator = document.createElement('div');
+        indicator.className = 'typing-indicator';
+        indicator.innerHTML = `
+            <div class="typing-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <span class="typing-text">AI agents are thinking...</span>
+        `;
+        
+        container.appendChild(indicator);
+        container.scrollTop = container.scrollHeight;
+        
+        return indicator;
+    }
+
+    /**
+     * Get message sender display name
+     */
+    getMessageSender(type, agents) {
+        switch (type) {
+            case 'user':
+                return 'You';
+            case 'assistant':
+                return agents && agents.length === 1 ? 
+                    `${agents[0]} Agent` : 'AI Assistant';
+            case 'system':
+                return 'System';
+            case 'error':
+                return 'Error';
+            default:
+                return 'Unknown';
+        }
+    }
+
+    /**
+     * Handle widget drag start
+     */
+    handleWidgetDragStart(widgetId, event) {
+        if (event.target.closest('.widget-control-btn')) return;
+        
+        event.preventDefault();
+        
+        const element = document.getElementById(widgetId);
+        const rect = element.getBoundingClientRect();
+        const canvas = document.getElementById('canvas-workspace');
+        const canvasRect = canvas.getBoundingClientRect();
+        
+        this.dragData = {
+            widgetId,
+            startX: event.clientX,
+            startY: event.clientY,
+            elementX: rect.left - canvasRect.left + canvas.scrollLeft,
+            elementY: rect.top - canvasRect.top + canvas.scrollTop,
+            offsetX: event.clientX - rect.left,
+            offsetY: event.clientY - rect.top
+        };
+        
+        element.classList.add('dragging');
+        this.selectWidget(widgetId);
+        
+        // Announce drag start
+        AICanvas.announceToScreenReader(`Started dragging ${this.widgets.get(widgetId).title}`);
+    }
+
+    /**
+     * Handle widget resize start
+     */
+    handleWidgetResizeStart(widgetId, event) {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        const element = document.getElementById(widgetId);
+        const rect = element.getBoundingClientRect();
+        
+        this.resizeData = {
+            widgetId,
+            startX: event.clientX,
+            startY: event.clientY,
+            startWidth: rect.width,
+            startHeight: rect.height
+        };
+        
+        this.selectWidget(widgetId);
+        
+        // Announce resize start
+        AICanvas.announceToScreenReader(`Started resizing ${this.widgets.get(widgetId).title}`);
+    }
+
+    /**
+     * Handle mouse move for drag/resize
+     */
+    handleMouseMove(event) {
+        if (this.dragData) {
+            this.handleWidgetDrag(event);
+        } else if (this.resizeData) {
+            this.handleWidgetResize(event);
+        }
+    }
+
+    /**
+     * Handle widget dragging
+     */
+    handleWidgetDrag(event) {
+        const { widgetId, elementX, elementY, offsetX, offsetY } = this.dragData;
+        const element = document.getElementById(widgetId);
+        const canvas = document.getElementById('canvas-workspace');
+        const canvasRect = canvas.getBoundingClientRect();
+        
+        const newX = event.clientX - canvasRect.left + canvas.scrollLeft - offsetX;
+        const newY = event.clientY - canvasRect.top + canvas.scrollTop - offsetY;
+        
+        // Constrain to canvas bounds
+        const constrainedX = Math.max(0, Math.min(newX, canvas.scrollWidth - element.offsetWidth));
+        const constrainedY = Math.max(0, Math.min(newY, canvas.scrollHeight - element.offsetHeight));
+        
+        element.style.transform = `translate(${constrainedX}px, ${constrainedY}px)`;
+        
+        // Update widget data
+        const widget = this.widgets.get(widgetId);
+        widget.position = { x: constrainedX, y: constrainedY };
+    }
+
+    /**
+     * Handle widget resizing
+     */
+    handleWidgetResize(event) {
+        const { widgetId, startX, startY, startWidth, startHeight } = this.resizeData;
+        const element = document.getElementById(widgetId);
+        const template = this.templates.get(this.widgets.get(widgetId).type);
+        
+        const deltaX = event.clientX - startX;
+        const deltaY = event.clientY - startY;
+        
+        const newWidth = Math.max(template.minSize.width, 
+                         Math.min(template.maxSize.width, startWidth + deltaX));
+        const newHeight = Math.max(template.minSize.height, 
+                          Math.min(template.maxSize.height, startHeight + deltaY));
+        
+        element.style.width = newWidth + 'px';
+        element.style.height = newHeight + 'px';
+        
+        // Update widget data
+        const widget = this.widgets.get(widgetId);
+        widget.size = { width: newWidth, height: newHeight };
+    }
+
+    /**
+     * Handle mouse up (end drag/resize)
+     */
+    handleMouseUp(event) {
+        if (this.dragData) {
+            const element = document.getElementById(this.dragData.widgetId);
+            element.classList.remove('dragging');
+            
+            // Announce drag end
+            AICanvas.announceToScreenReader(`Finished dragging ${this.widgets.get(this.dragData.widgetId).title}`);
+            
+            this.dragData = null;
+        }
+        
+        if (this.resizeData) {
+            // Announce resize end
+            AICanvas.announceToScreenReader(`Finished resizing ${this.widgets.get(this.resizeData.widgetId).title}`);
+            
+            this.resizeData = null;
+        }
+    }
+
+    /**
+     * Handle widget control button clicks
+     */
+    handleWidgetControl(widgetId, event) {
+        event.stopPropagation();
+        
+        const action = event.target.closest('.widget-control-btn').dataset.action;
+        
+        switch (action) {
+            case 'configure':
+                this.configureWidget(widgetId);
+                break;
+            case 'pin':
+                this.toggleWidgetPin(widgetId);
+                break;
+            case 'close':
+                this.closeWidget(widgetId);
+                break;
+        }
+    }
+
+    /**
+     * Configure widget settings
+     */
+    configureWidget(widgetId) {
+        // Implementation for widget configuration modal
+        console.log('Configure widget:', widgetId);
+        // This would open a configuration modal specific to the widget type
+    }
+
+    /**
+     * Toggle widget pin status
+     */
+    toggleWidgetPin(widgetId) {
+        const widget = this.widgets.get(widgetId);
+        const element = document.getElementById(widgetId);
+        
+        widget.pinned = !widget.pinned;
+        
+        if (widget.pinned) {
+            element.classList.add('pinned');
+            element.querySelector('[data-action="pin"]').setAttribute('aria-pressed', 'true');
+        } else {
+            element.classList.remove('pinned');
+            element.querySelector('[data-action="pin"]').setAttribute('aria-pressed', 'false');
+        }
+        
+        // Announce change
+        AICanvas.announceToScreenReader(
+            `Widget ${widget.pinned ? 'pinned' : 'unpinned'}`
+        );
+        
+        NotificationManager.show({
+            type: 'info',
+            title: widget.pinned ? 'Widget Pinned' : 'Widget Unpinned',
+            message: `${widget.title} ${widget.pinned ? 'will remain' : 'can be removed'} when switching presets`,
+            duration: 3000
+        });
+    }
+
+    /**
+     * Close widget
+     */
+    closeWidget(widgetId) {
+        const widget = this.widgets.get(widgetId);
+        const element = document.getElementById(widgetId);
+        
+        // Confirm if widget has unsaved changes
+        if (this.hasUnsavedChanges(widgetId)) {
+            if (!confirm('This widget has unsaved changes. Are you sure you want to close it?')) {
+                return;
+            }
+        }
+        
+        // Animate removal
+        element.style.transform += ' scale(0)';
+        element.style.opacity = '0';
+        
+        setTimeout(() => {
+            element.remove();
+            this.widgets.delete(widgetId);
+            
+            // Emit destruction event
+            document.dispatchEvent(new CustomEvent('widget:destroyed', {
+                detail: { widgetId }
+            }));
+            
+            // If this was the selected widget, clear selection
+            if (this.selectedWidget === widgetId) {
+                this.selectedWidget = null;
+            }
+        }, 200);
+        
+        // Announce removal
+        AICanvas.announceToScreenReader(`${widget.title} widget closed`);
+    }
+
+    /**
+     * Check if widget has unsaved changes
+     */
+    hasUnsavedChanges(widgetId) {
+        const widget = this.widgets.get(widgetId);
+        // Implementation would check for unsaved state
+        return false;
+    }
+
+    /**
+     * Select a widget
+     */
+    selectWidget(widgetId) {
+        // Deselect current widget
+        if (this.selectedWidget) {
+            const currentElement = document.getElementById(this.selectedWidget);
+            if (currentElement) {
+                currentElement.classList.remove('selected');
+            }
+        }
+        
+        // Select new widget
+        this.selectedWidget = widgetId;
+        const element = document.getElementById(widgetId);
+        if (element) {
+            element.classList.add('selected');
+            element.focus();
+        }
+    }
+
+    /**
+     * Handle canvas click (deselect widgets)
+     */
+    handleCanvasClick(event) {
+        if (event.target.id === 'canvas-workspace' || 
+            event.target.classList.contains('canvas-grid')) {
+            this.selectWidget(null);
+        }
+    }
+
+    /**
+     * Handle canvas keyboard navigation
+     */
+    handleCanvasKeyDown(event) {
+        if (event.key === 'Escape') {
+            this.selectWidget(null);
+        }
+    }
+
+    /**
+     * Handle widget click
+     */
+    handleWidgetClick(widgetId, event) {
+        event.stopPropagation();
+        this.selectWidget(widgetId);
+    }
+
+    /**
+     * Handle widget keyboard events
+     */
+    handleWidgetKeyDown(widgetId, event) {
+        if (event.key === 'Delete' && event.target.classList.contains('widget')) {
+            this.closeWidget(widgetId);
+        }
+    }
+
+    /**
+     * Position widget on canvas
+     */
+    positionWidget(element, position, size) {
+        element.style.transform = `translate(${position.x}px, ${position.y}px)`;
+        element.style.width = size.width + 'px';
+        element.style.height = size.height + 'px';
+    }
+
+    /**
+     * Get default position for new widgets
+     */
+    getDefaultPosition() {
+        const offset = this.widgets.size * 30;
+        return {
+            x: 50 + offset,
+            y: 100 + offset
+        };
+    }
+
+    /**
+     * Update widget configuration
+     */
+    updateWidgetConfig(widgetId, config) {
+        const widget = this.widgets.get(widgetId);
+        if (widget) {
+            Object.assign(widget.config, config);
+        }
+    }
+
+    /**
+     * Adjust widgets to viewport after layout changes
+     */
+    adjustWidgetsToViewport() {
+        const canvas = document.getElementById('canvas-workspace');
+        const canvasRect = canvas.getBoundingClientRect();
+        
+        this.widgets.forEach((widget, widgetId) => {
+            const element = document.getElementById(widgetId);
+            if (!element) return;
+            
+            const rect = element.getBoundingClientRect();
+            
+            // Check if widget is outside viewport
+            if (rect.right > canvasRect.right || rect.bottom > canvasRect.bottom) {
+                const newX = Math.max(0, Math.min(widget.position.x, 
+                    canvasRect.width - widget.size.width));
+                const newY = Math.max(0, Math.min(widget.position.y, 
+                    canvasRect.height - widget.size.height));
+                
+                widget.position = { x: newX, y: newY };
+                this.positionWidget(element, widget.position, widget.size);
+            }
+        });
+    }
+
+    /**
+     * Clear all unpinned widgets
+     */
+    clearUnpinnedWidgets() {
+        const toRemove = [];
+        
+        this.widgets.forEach((widget, widgetId) => {
+            if (!widget.pinned) {
+                toRemove.push(widgetId);
+            }
+        });
+        
+        toRemove.forEach(widgetId => {
+            this.closeWidget(widgetId);
+        });
+    }
+
+    /**
+     * Clear all widgets
+     */
+    clearAllWidgets() {
+        const toRemove = Array.from(this.widgets.keys());
+        toRemove.forEach(widgetId => {
+            this.closeWidget(widgetId);
+        });
+    }
+
+    /**
+     * Get serializable state for saving/export
+     */
+    getSerializableState() {
+        const state = [];
+        
+        this.widgets.forEach(widget => {
+            state.push({
+                id: widget.id,
+                type: widget.type,
+                title: widget.title,
+                position: widget.position,
+                size: widget.size,
+                config: widget.config,
+                pinned: widget.pinned,
+                created: widget.created
+            });
+        });
+        
+        return state;
+    }
+
+    /**
+     * Create widget from saved data
+     */
+    createWidgetFromData(data) {
+        return this.createWidget({
+            type: data.type,
+            title: data.title,
+            position: data.position,
+            size: data.size,
+            config: data.config
+        });
+    }
+
+    /**
+     * Handle agent response
+     */
+    handleAgentResponse(responseData) {
+        const { widgetId, response } = responseData;
+        const widget = this.widgets.get(widgetId);
+        
+        if (!widget || widget.type !== 'multi-agent-chat') return;
+        
+        const element = document.getElementById(widgetId);
+        const messagesContainer = element.querySelector('.chat-messages');
+        
+        // Remove any typing indicators
+        const typingIndicator = messagesContainer.querySelector('.typing-indicator');
+        if (typingIndicator) {
+            typingIndicator.remove();
+        }
+        
+        // Add response message
+        this.addChatMessage(messagesContainer, {
+            type: 'assistant',
+            content: response.content,
+            sources: response.sources,
+            agents: response.agents,
+            timestamp: new Date()
+        });
+    }
+
+    /**
+     * Escape HTML to prevent XSS
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Static methods for global access
+    static handleFileDrop(event, widgetId) {
+        event.preventDefault();
+        const files = Array.from(event.dataTransfer.files);
+        WidgetManager.instance.processUploadedFiles(widgetId, files);
+    }
+
+    static startWorkflow(widgetId) {
+        WidgetManager.instance.startWorkflow(widgetId);
+    }
+
+    static configureWorkflow(widgetId) {
+        WidgetManager.instance.configureWorkflow(widgetId);
+    }
+
+    /**
+     * Process uploaded files for document widget
+     */
+    processUploadedFiles(widgetId, files) {
+        const widget = this.widgets.get(widgetId);
+        if (!widget || widget.type !== 'document-processor') return;
+        
+        const element = document.getElementById(widgetId);
+        const statusElement = element.querySelector('.processing-status p');
+        
+        statusElement.textContent = `Processing ${files.length} file(s)...`;
+        
+        // Simulate file processing
+        files.forEach((file, index) => {
+            setTimeout(() => {
+                console.log('Processing file:', file.name);
+                // In real implementation, would send to agent orchestrator
+                
+                if (index === files.length - 1) {
+                    statusElement.textContent = `Processed ${files.length} file(s) successfully`;
+                }
+            }, (index + 1) * 1000);
+        });
+    }
+
+    /**
+     * Start workflow execution
+     */
+    startWorkflow(widgetId) {
+        const widget = this.widgets.get(widgetId);
+        if (!widget || widget.type !== 'workflow-orchestrator') return;
+        
+        const element = document.getElementById(widgetId);
+        const steps = element.querySelectorAll('.workflow-step');
+        
+        // Simulate workflow execution
+        steps.forEach((step, index) => {
+            setTimeout(() => {
+                step.classList.add('active');
+                const status = step.querySelector('.step-status');
+                status.textContent = 'In Progress';
+                
+                setTimeout(() => {
+                    step.classList.remove('active');
+                    step.classList.add('completed');
+                    status.textContent = 'Completed';
+                }, 2000);
+            }, index * 3000);
+        });
+    }
+
+    /**
+     * Configure workflow
+     */
+    configureWorkflow(widgetId) {
+        console.log('Configure workflow:', widgetId);
+        // Implementation for workflow configuration
+    }
+}
+
+// Create global instance
+window.WidgetManager = new WidgetManager();
