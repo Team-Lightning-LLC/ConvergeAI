@@ -1,1 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Canvas - Enterprise Agent Orchestration Platform</title>
+    
+    <!-- Accessibility -->
+    <meta name="description" content="Professional AI agent orchestration platform for enterprise workflows">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/layout.css">
+</head>
+<body>
+    <!-- Skip Navigation for Screen Readers -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
+    <!-- Application Header -->
+    <header class="app-header" role="banner">
+        <div class="header-content">
+            <div class="brand-section">
+                <h1 class="app-title">AI Canvas</h1>
+                <span class="app-subtitle">Enterprise Agent Orchestration</span>
+            </div>
+            
+            <nav class="header-nav" role="navigation" aria-label="Main navigation">
+                <div class="preset-controls">
+                    <label for="workspace-preset" class="sr-only">Select workspace preset</label>
+                    <select id="workspace-preset" class="preset-selector" aria-describedby="preset-help">
+                        <option value="executive">Executive Dashboard</option>
+                        <option value="hr-manager">HR Management</option>
+                        <option value="developer">Developer Tools</option>
+                        <option value="analyst">Data Analysis</option>
+                        <option value="custom">Custom Configuration</option>
+                    </select>
+                    <div id="preset-help" class="sr-only">
+                        Choose a predefined workspace configuration optimized for your role
+                    </div>
+                </div>
+                
+                <div class="user-profile">
+                    <button class="user-menu-toggle" aria-expanded="false" aria-haspopup="true" 
+                            aria-describedby="user-menu" id="user-button">
+                        <span class="user-name">Sarah Chen</span>
+                        <span class="user-email">s.chen@company.com</span>
+                        <div class="user-avatar" aria-hidden="true">SC</div>
+                    </button>
+                </div>
+            </nav>
+        </div>
+    </header>
 
+    <!-- Main Application Layout -->
+    <div class="app-layout">
+        <!-- Sidebar Panel -->
+        <aside class="sidebar" role="complementary" aria-label="Agent tools and configuration">
+            <button class="sidebar-toggle" aria-expanded="true" aria-controls="sidebar-content" 
+                    aria-label="Toggle sidebar visibility">
+                <span class="toggle-icon"></span>
+            </button>
+            
+            <div id="sidebar-content" class="sidebar-content">
+                <!-- Widget Templates -->
+                <section class="widget-templates" aria-labelledby="templates-heading">
+                    <h2 id="templates-heading" class="section-title">Widget Templates</h2>
+                    <div class="template-grid" role="group" aria-label="Available widget templates">
+                        <div class="template-card" draggable="true" data-widget-type="multi-agent-chat" 
+                             tabindex="0" role="button" aria-describedby="chat-template-desc">
+                            <div class="template-icon chat-icon" aria-hidden="true"></div>
+                            <h3 class="template-title">Multi-Agent Chat</h3>
+                            <p id="chat-template-desc" class="template-description">
+                                Query multiple agents simultaneously with intelligent routing
+                            </p>
+                        </div>
+                        
+                        <div class="template-card" draggable="true" data-widget-type="document-processor"
+                             tabindex="0" role="button" aria-describedby="doc-template-desc">
+                            <div class="template-icon document-icon" aria-hidden="true"></div>
+                            <h3 class="template-title">Document Processor</h3>
+                            <p id="doc-template-desc" class="template-description">
+                                Upload and analyze documents with specialized agents
+                            </p>
+                        </div>
+                        
+                        <div class="template-card" draggable="true" data-widget-type="workflow-orchestrator"
+                             tabindex="0" role="button" aria-describedby="workflow-template-desc">
+                            <div class="template-icon workflow-icon" aria-hidden="true"></div>
+                            <h3 class="template-title">Workflow Orchestrator</h3>
+                            <p id="workflow-template-desc" class="template-description">
+                                Coordinate complex multi-step agent workflows
+                            </p>
+                        </div>
+                        
+                        <div class="template-card" draggable="true" data-widget-type="analytics-dashboard"
+                             tabindex="0" role="button" aria-describedby="analytics-template-desc">
+                            <div class="template-icon analytics-icon" aria-hidden="true"></div>
+                            <h3 class="template-title">Analytics Dashboard</h3>
+                            <p id="analytics-template-desc" class="template-description">
+                                Monitor agent performance and usage metrics
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Agent Pool -->
+                <section class="agent-pool" aria-labelledby="agents-heading">
+                    <h2 id="agents-heading" class="section-title">Connected Agents</h2>
+                    <div class="agent-list" role="list" aria-label="Available AI agents">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </section>
+
+                <!-- Quick Presets -->
+                <section class="quick-presets" aria-labelledby="presets-heading">
+                    <h2 id="presets-heading" class="section-title">Quick Presets</h2>
+                    <div class="preset-buttons" role="group" aria-label="Quick workspace configurations">
+                        <button class="preset-btn active" data-preset="all-agents">All Agents</button>
+                        <button class="preset-btn" data-preset="hr-focus">HR Focus</button>
+                        <button class="preset-btn" data-preset="finance-tools">Finance Tools</button>
+                        <button class="preset-btn" data-preset="policy-search">Policy Search</button>
+                    </div>
+                </section>
+            </div>
+        </aside>
+
+        <!-- Main Canvas Area -->
+        <main id="main-content" class="canvas-container" role="main" 
+              aria-label="AI Agent Workspace Canvas">
+            <div class="canvas-header">
+                <div class="workspace-status">
+                    <span class="status-indicator active" aria-hidden="true"></span>
+                    <span class="status-text">Smart Router Active</span>
+                    <span class="agent-count">5 agents connected</span>
+                </div>
+                
+                <div class="canvas-controls">
+                    <button class="control-btn" aria-label="Reset canvas layout">
+                        Reset Layout
+                    </button>
+                    <button class="control-btn" aria-label="Save current workspace">
+                        Save Workspace
+                    </button>
+                    <button class="control-btn" aria-label="Export workspace configuration">
+                        Export Config
+                    </button>
+                </div>
+            </div>
+            
+            <div class="canvas-workspace" id="canvas-workspace" role="application" 
+                 aria-label="Drag and drop workspace for AI widgets">
+                <div class="canvas-grid" aria-hidden="true"></div>
+                
+                <!-- Sample Widgets (for demo) -->
+                <div class="widget" data-widget-id="demo-chat" style="transform: translate(50px, 100px)">
+                    <div class="widget-header">
+                        <h3 class="widget-title">HR Inquiry Hub</h3>
+                        <div class="widget-controls">
+                            <button class="widget-control-btn" aria-label="Configure widget settings">
+                                <span class="control-icon settings-icon" aria-hidden="true"></span>
+                            </button>
+                            <button class="widget-control-btn" aria-label="Pin widget to workspace">
+                                <span class="control-icon pin-icon" aria-hidden="true"></span>
+                            </button>
+                            <button class="widget-control-btn" aria-label="Close widget">
+                                <span class="control-icon close-icon" aria-hidden="true"></span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="widget-content">
+                        <div class="agent-selector">
+                            <label class="sr-only">Select active agents for this widget</label>
+                            <div class="agent-chips" role="group" aria-label="Agent selection">
+                                <button class="agent-chip active" data-agent="workday">
+                                    Workday Assistant
+                                </button>
+                                <button class="agent-chip active" data-agent="policy">
+                                    Policy Bot
+                                </button>
+                                <button class="agent-chip" data-agent="healthcare">
+                                    Healthcare Bot
+                                </button>
+                                <button class="agent-chip" data-agent="finance">
+                                    Finance Helper
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="chat-container">
+                            <div class="chat-messages" role="log" aria-live="polite" aria-label="Chat conversation">
+                                <!-- Messages populated by JavaScript -->
+                            </div>
+                            
+                            <form class="chat-input-form" aria-label="Send message to agents">
+                                <label for="chat-input" class="sr-only">Enter your message</label>
+                                <input type="text" id="chat-input" class="chat-input" 
+                                       placeholder="Ask about HR policies, benefits, or procedures..."
+                                       aria-describedby="input-help">
+                                <div id="input-help" class="sr-only">
+                                    Type your question and press Enter or click Send
+                                </div>
+                                <button type="submit" class="send-button" aria-label="Send message">
+                                    Send
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <div class="widget-resize-handle" aria-label="Resize widget"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Notification Area -->
+    <div id="notification-area" role="region" aria-live="polite" aria-label="System notifications"></div>
+
+    <!-- Accessibility Announcements -->
+    <div id="accessibility-announcements" role="status" aria-live="assertive" class="sr-only"></div>
+
+    <!-- Scripts -->
+    <script src="js/utils/accessibility.js"></script>
+    <script src="js/utils/keyboard-shortcuts.js"></script>
+    <script src="js/core/canvas.js"></script>
+    <script src="js/core/widget-manager.js"></script>
+    <script src="js/core/agent-orchestrator.js"></script>
+    <script src="js/components/sidebar.js"></script>
+    <script src="js/components/widgets.js"></script>
+    <script src="js/components/notifications.js"></script>
+    
+    <!-- Initialize Application -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            AICanvas.initialize();
+        });
+    </script>
+</body>
+</html>
